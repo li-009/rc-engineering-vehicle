@@ -1,241 +1,593 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 
 <head>
     <meta charset="UTF-8">
-    <title>RC Fleet Command Center</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>工程车云控指挥中心 (RC Command)</title>
     <style>
+        :root {
+            --bg-color: #0b0c10;
+            --panel-bg: rgba(31, 40, 51, 0.8);
+            --accent-color: #66fcf1;
+            --text-color: #c5c6c7;
+            --danger-color: #ff3b3b;
+            --success-color: #45a29e;
+        }
+
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #1a1a1a;
-            color: #eee;
             margin: 0;
-            display: flex;
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
             height: 100vh;
+            overflow: hidden;
+            display: grid;
+            grid-template-columns: 280px 1fr 300px;
+            grid-template-rows: 60px 1fr;
+            background-image:
+                radial-gradient(circle at 50% 50%, #1a1d24 0%, #0b0c10 100%);
         }
 
-        #sidebar {
-            width: 300px;
-            background: #2d2d2d;
-            padding: 20px;
-            border-right: 1px solid #444;
+        /* --- Header --- */
+        .header {
+            grid-column: 1 / -1;
+            background: rgba(11, 12, 16, 0.95);
+            border-bottom: 1px solid #333;
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+            z-index: 10;
         }
 
-        #main {
-            flex: 1;
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+            color: var(--accent-color);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            display: flex;
+            align-items: center;
+        }
+
+        .logo::before {
+            content: '⚡';
+            margin-right: 10px;
+            font-size: 28px;
+        }
+
+        .status-bar {
+            margin-left: auto;
+            display: flex;
+            gap: 20px;
+            font-size: 14px;
+        }
+
+        .connection-status {
+            display: flex;
+            align-items: center;
+            color: var(--success-color);
+        }
+
+        .connection-status::before {
+            content: '';
+            display: block;
+            width: 8px;
+            height: 8px;
+            background: currentColor;
+            border-radius: 50%;
+            margin-right: 8px;
+            box-shadow: 0 0 8px currentColor;
+        }
+
+        /* --- Sidebar (Fleet) --- */
+        .sidebar {
+            background: var(--panel-bg);
+            border-right: 1px solid #333;
             padding: 20px;
+            backdrop-filter: blur(10px);
             display: flex;
             flex-direction: column;
+        }
+
+        .panel-title {
+            color: #fff;
+            font-size: 16px;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--accent-color);
+            display: flex;
+            justify-content: space-between;
             align-items: center;
-            justify-content: start;
         }
 
-        h2 {
-            margin-top: 0;
-            color: #4caf50;
-        }
-
-        .car-item {
-            background: #3d3d3d;
-            padding: 10px;
-            margin-bottom: 10px;
-            border-radius: 4px;
+        .vehicle-card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
             cursor: pointer;
-            transition: 0.2s;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .vehicle-card:hover {
+            border-color: var(--accent-color);
+            transform: translateY(-2px);
+            background: rgba(102, 252, 241, 0.1);
+        }
+
+        .vehicle-card.active {
+            border: 1px solid var(--accent-color);
+            box-shadow: 0 0 15px rgba(102, 252, 241, 0.2);
+            background: rgba(102, 252, 241, 0.05);
+        }
+
+        .vehicle-id {
+            color: #fff;
+            font-weight: bold;
+            font-size: 16px;
+            margin-bottom: 5px;
+        }
+
+        .vehicle-meta {
+            font-size: 12px;
+            color: #888;
             display: flex;
             justify-content: space-between;
         }
 
-        .car-item:hover {
-            background: #505050;
+        .tag {
+            background: #222;
+            padding: 2px 6px;
+            border-radius: 4px;
         }
 
-        .car-item.active {
-            border-left: 4px solid #4caf50;
-            background: #383838;
+        .tag.online {
+            color: var(--success-color);
         }
 
-        .status-dot {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            background: #ccc;
+        .tag.offline {
+            color: #666;
         }
 
-        .online {
-            background: #4caf50;
-        }
-
-        #video-container {
-            width: 640px;
-            height: 480px;
-            background: #000;
-            border: 2px solid #555;
-            margin-bottom: 20px;
+        /* --- Main (Cockpit) --- */
+        .cockpit {
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
             position: relative;
         }
 
-        canvas {
+        .video-frame {
             width: 100%;
+            max-width: 800px;
+            aspect-ratio: 4/3;
+            background: #000;
+            border: 2px solid #333;
+            position: relative;
+            border-radius: 4px;
+            box-shadow: 0 0 50px rgba(0, 0, 0, 0.5);
+            overflow: hidden;
+        }
+
+        /* HUD Overlay */
+        .hud-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            padding: 20px;
+            pointer-events: none;
+            box-sizing: border-box;
+            background: linear-gradient(0deg, rgba(0, 0, 0, 0.2) 0%, transparent 20%, transparent 80%, rgba(0, 0, 0, 0.2) 100%);
+        }
+
+        .hud-corner {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            border: 2px solid var(--accent-color);
+            opacity: 0.5;
+        }
+
+        .hud-tl {
+            top: 10px;
+            left: 10px;
+            border-right: none;
+            border-bottom: none;
+        }
+
+        .hud-tr {
+            top: 10px;
+            right: 10px;
+            border-left: none;
+            border-bottom: none;
+        }
+
+        .hud-bl {
+            bottom: 10px;
+            left: 10px;
+            border-right: none;
+            border-top: none;
+        }
+
+        .hud-br {
+            bottom: 10px;
+            right: 10px;
+            border-left: none;
+            border-top: none;
+        }
+
+        .hud-info {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            font-family: 'Courier New', monospace;
+            color: var(--accent-color);
+            text-shadow: 0 0 5px var(--accent-color);
+        }
+
+        .hud-crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 40px;
+            height: 40px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .hud-crosshair::after {
+            content: '';
+            width: 4px;
+            height: 4px;
+            background: var(--danger-color);
+            border-radius: 50%;
+        }
+
+        .no-signal {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #555;
+            font-size: 20px;
+            text-transform: uppercase;
+            letter-spacing: 5px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .scan-line {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
             height: 100%;
+            background: linear-gradient(to bottom, transparent, rgba(102, 252, 241, 0.05), transparent);
+            animation: scan 4s linear infinite;
         }
 
-        #controls {
+        @keyframes scan {
+            0% {
+                transform: translateY(-100%);
+            }
+
+            100% {
+                transform: translateY(100%);
+            }
+        }
+
+        /* --- Right Panel (Telemetry) --- */
+        .controls-panel {
+            background: var(--panel-bg);
+            border-left: 1px solid #333;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .stats-grid {
             display: grid;
-            grid-template-columns: repeat(3, 60px);
-            gap: 10px;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
         }
 
-        button {
-            padding: 15px;
-            background: #444;
+        .stat-box {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 10px;
+            border-radius: 6px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            color: #fff;
+            font-family: 'Courier New', monospace;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .log-terminal {
+            flex: 1;
+            background: #000;
+            border: 1px solid #333;
+            border-radius: 4px;
+            padding: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            color: #0f0;
+            overflow-y: auto;
+            opacity: 0.8;
+        }
+
+        .log-line {
+            margin: 2px 0;
+        }
+
+        .log-time {
+            color: #666;
+            margin-right: 5px;
+        }
+
+        /* --- Footer Controls --- */
+        .control-pad {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            max-width: 200px;
+            margin: 0 auto;
+        }
+
+        .btn-ctrl {
+            background: #333;
             border: none;
             color: white;
-            border-radius: 4px;
+            padding: 15px;
+            border-radius: 8px;
             cursor: pointer;
-            font-size: 18px;
+            transition: 0.1s;
+            box-shadow: 0 4px 0 #222;
         }
 
-        button:active {
-            background: #4caf50;
-        }
-
-        pre {
-            background: #000;
-            padding: 10px;
-            width: 100%;
-            height: 100px;
-            overflow-y: scroll;
-            font-size: 12px;
-            font-family: monospace;
+        .btn-ctrl:active {
+            transform: translateY(4px);
+            box-shadow: none;
+            background: var(--accent-color);
+            color: #000;
         }
     </style>
 </head>
 
 <body>
 
-    <div id="sidebar">
-        <h2>🚜 Vehicle Fleet</h2>
-        <div id="car-list">
-            <div class="car-item">
-                <span>Scanning for vehicles...</span>
+    <!-- Header -->
+    <header class="header">
+        <div class="logo">RC CLOUD <span style="font-size:12px; margin-left:10px; color:#666;">v1.0.0</span></div>
+        <div class="status-bar">
+            <div class="connection-status" id="server-status">服务器连接中...</div>
+            <div>用户ID: <span id="user-id">Guest</span></div>
+            <div>延时: <span id="ping-val">--</span>ms</div>
+        </div>
+    </header>
+
+    <!-- Sidebar: Fleet List -->
+    <aside class="sidebar">
+        <div class="panel-title">
+            <span>在线车队 (Fleet)</span>
+            <span class="tag" id="car-count">0</span>
+        </div>
+        <div id="fleet-list">
+            <!-- JS will populate this -->
+            <div style="text-align:center; color:#555; margin-top:50px;">正在扫描频段...</div>
+        </div>
+    </aside>
+
+    <!-- Main: Video Cockpit -->
+    <main class="cockpit">
+        <div class="video-frame">
+            <div class="scan-line"></div>
+
+            <!-- Video Canvas or Img -->
+            <div class="no-signal" id="no-signal-text">
+                <div style="font-size:48px; margin-bottom:20px;">📶</div>
+                <div>WAITING FOR SIGNAL</div>
+                <div style="font-size:12px; color:#444; margin-top:10px;">请选择左侧车辆以接入画面</div>
+            </div>
+
+            <!-- HUD Overlay -->
+            <div class="hud-layer">
+                <div class="hud-corner hud-tl"></div>
+                <div class="hud-corner hud-tr"></div>
+                <div class="hud-corner hud-bl"></div>
+                <div class="hud-corner hud-br"></div>
+
+                <div class="hud-info">
+                    CAM_ID: <span id="hud-cam-id">NONE</span><br>
+                    MODE: <span style="color:var(--success-color)">REMOTE</span><br>
+                    BAT: <span id="hud-bat">100%</span>
+                </div>
+
+                <div class="hud-crosshair"></div>
             </div>
         </div>
 
-        <div style="margin-top: 50px;">
-            <h3>System Log</h3>
-            <pre id="log">Connecting to HQ...</pre>
+        <!-- Manual Controls (Visual) -->
+        <div style="margin-top: 30px;">
+            <div class="control-pad">
+                <div></div>
+                <button class="btn-ctrl" onmousedown="sendCmd('up')" onmouseup="sendCmd('stop')">W</button>
+                <div></div>
+                <button class="btn-ctrl" onmousedown="sendCmd('left')" onmouseup="sendCmd('stop')">A</button>
+                <button class="btn-ctrl" onmousedown="sendCmd('down')" onmouseup="sendCmd('stop')">S</button>
+                <button class="btn-ctrl" onmousedown="sendCmd('right')" onmouseup="sendCmd('stop')">D</button>
+            </div>
+            <div style="text-align:center; font-size:12px; color:#555; margin-top:10px;">支持键盘 WASD 控制</div>
         </div>
-    </div>
+    </main>
 
-    <div id="main">
-        <h1>Remote Operation Console</h1>
-        <div id="video-container">
-            <!-- Video Canvas will be here -->
-            <div style="position: absolute; top: 10px; left: 10px; color: yellow;">Live Feed: <span
-                    id="current-car">None</span></div>
+    <!-- Right: Telemetry -->
+    <aside class="controls-panel">
+        <div class="panel-title">遥测数据 (Telemetry)</div>
+        <div class="stats-grid">
+            <div class="stat-box">
+                <div class="stat-value" id="ui-spd">0</div>
+                <div class="stat-label">速度 (cm/s)</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value" style="color:var(--accent-color)" id="ui-fps">0</div>
+                <div class="stat-label">帧率 (FPS)</div>
+            </div>
         </div>
 
-        <div id="controls">
-            <button></button>
-            <button onclick="sendCommand('up')">⬆️</button>
-            <button></button>
-            <button onclick="sendCommand('left')">⬅️</button>
-            <button onclick="sendCommand('down')">⬇️</button>
-            <button onclick="sendCommand('right')">➡️</button>
+        <div class="panel-title" style="margin-top:20px;">系统日志 (System Log)</div>
+        <div class="log-terminal" id="sys-log">
+            <div class="log-line"><span class="log-time">[sys]</span> System initializing...</div>
         </div>
-    </div>
+
+        <button class="btn-ctrl" style="width:100%; background:var(--danger-color); margin-top:auto;">❌ 紧急停车
+            (E-STOP)</button>
+    </aside>
 
     <script>
-        // --- Frontend Agent Logic ---
-        const ws = new WebSocket(`ws://${location.host}/ws`);
-        const logEl = document.getElementById('log');
+        const logBox = document.getElementById('sys-log');
+        const fleetList = document.getElementById('fleet-list');
+        const hudCamId = document.getElementById('hud-cam-id');
+        let selectedCarId = null;
 
-        // Simulate Video Player (Just a placeholder for now, normally use JSMpeg)
-        // In real implementation, we would feed binary data to jsmpeg pipe.
+        function log(msg, type = 'sys') {
+            const div = document.createElement('div');
+            div.className = 'log-line';
+            const time = new Date().toLocaleTimeString();
+            let color = '#0f0';
+            if (type === 'err') color = '#f00';
+            if (type === 'warn') color = '#ff0';
+
+            div.innerHTML = `<span class="log-time">[${time}]</span> <span style="color:${color}">${msg}</span>`;
+            logBox.appendChild(div);
+            logBox.scrollTop = logBox.scrollHeight;
+        }
+
+        // Connect WS
+        const ws = new WebSocket(`ws://${location.host}/ws`);
 
         ws.onopen = () => {
-            log('Connected to Relay Server.');
-            // Authenticate
+            document.getElementById('server-status').innerText = "已连接云端";
+            document.getElementById('server-status').style.color = "#45a29e";
             ws.send(JSON.stringify({ type: 'auth', role: 'user' }));
+            log("WebSocket connection established.");
         };
 
-        ws.onmessage = async (event) => {
-            const msg = event.data;
+        ws.onclose = () => {
+            document.getElementById('server-status').innerText = "连接断开";
+            document.getElementById('server-status').style.color = "#ff3b3b";
+            log("Connection lost.", "err");
+        };
 
-            // 1. Binary Video Data
+        ws.onmessage = (event) => {
+            const msg = event.data;
             if (msg instanceof Blob) {
-                // In a real app, feed this to JSMpeg player
-                // console.log("Video frame received", msg.size);
+                // Video Stream Logic (TODO: JSMpeg)
+                // log("Recv Video Frame: " + msg.size + " bytes");
                 return;
             }
 
-            // 2. JSON Control Data
             try {
                 const json = JSON.parse(msg);
                 if (json.type === 'car_list') {
-                    renderCarList(json.data);
+                    renderFleet(json.data);
                 }
             } catch (e) {
-                log('Error parsing msg: ' + e);
+                console.error(e);
             }
         };
 
-        function renderCarList(list) {
-            const container = document.getElementById('car-list');
-            container.innerHTML = '';
+        function renderFleet(cars) {
+            document.getElementById('car-count').innerText = cars.length;
+            fleetList.innerHTML = '';
 
-            if (list.length === 0) {
-                container.innerHTML = '<div style="padding:10px; color:#888;">No vehicles online</div>';
+            if (cars.length === 0) {
+                fleetList.innerHTML = '<div style="text-align:center; color:#444; margin-top:20px;">无车辆在线</div>';
                 return;
             }
 
-            list.forEach(car => {
+            cars.forEach(car => {
                 const div = document.createElement('div');
-                div.className = 'car-item';
-                div.innerHTML = `
-                <span>${car.id}</span>
-                <div class="status-dot online"></div>
-            `;
+                div.className = `vehicle-card ${selectedCarId === car.id ? 'active' : ''}`;
                 div.onclick = () => selectCar(car.id);
-                container.appendChild(div);
+                div.innerHTML = `
+                    <div class="vehicle-id">🚜 ${car.id}</div>
+                    <div class="vehicle-meta">
+                        <span class="tag online">ONLINE</span>
+                        <span>📶 -45dBm</span>
+                    </div>
+                `;
+                fleetList.appendChild(div);
             });
         }
 
-        let selectedCarId = null;
-
         function selectCar(id) {
             selectedCarId = id;
-            document.getElementById('current-car').innerText = id;
-            log(`Selected Control: ${id}`);
+            hudCamId.innerText = id;
+            document.getElementById('no-signal-text').style.display = 'none';
+            log(`接入车辆视频信号: ${id}`);
+
+            // Re-render to update active state
+            // (In real app, update DOM class directly instead of re-render list)
+            Array.from(document.getElementsByClassName('vehicle-card')).forEach(el => {
+                el.classList.remove('active');
+                if (el.textContent.includes(id)) el.classList.add('active');
+            });
         }
 
-        function sendCommand(dir) {
+        function sendCmd(action) {
             if (!selectedCarId) {
-                alert("Please select a vehicle from the list first!");
+                log("未选择车辆，无法发送指令", "warn");
                 return;
             }
+            log(`CMD >> ${action.toUpperCase()}`);
 
-            // Simple mapping for demo
-            const payload = { lx: 0, ly: 0 };
-            if (dir === 'up') payload.ly = 1;
-            if (dir === 'down') payload.ly = -1;
-            if (dir === 'left') payload.lx = -1;
-            if (dir === 'right') payload.lx = 1;
+            let payload = { lx: 0, ly: 0 };
+            if (action === 'up') payload.ly = 1;
+            if (action === 'down') payload.ly = -1;
+            if (action === 'left') payload.lx = -1;
+            if (action === 'right') payload.lx = 1;
 
-            const cmd = {
+            ws.send(JSON.stringify({
                 type: 'control',
                 target_id: selectedCarId,
                 payload: payload
-            };
-            ws.send(JSON.stringify(cmd));
-            log(`Sent ${dir} to ${selectedCarId}`);
+            }));
         }
 
-        function log(txt) {
-            logEl.textContent += `\n[${new Date().toLocaleTimeString()}] ${txt}`;
-            logEl.scrollTop = logEl.scrollHeight;
-        }
+        // Keyboard Support
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'w') sendCmd('up');
+            if (e.key === 's') sendCmd('down');
+            if (e.key === 'a') sendCmd('left');
+            if (e.key === 'd') sendCmd('right');
+        });
+        document.addEventListener('keyup', (e) => {
+            if (['w', 'a', 's', 'd'].includes(e.key)) sendCmd('stop');
+        });
+
     </script>
 </body>
 
