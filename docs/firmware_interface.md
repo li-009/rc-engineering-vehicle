@@ -62,4 +62,47 @@ void onWebSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
 *   **分辨率**: 请务必设置为 `FRAMESIZE_QVGA` (320x240)。这是保证 25fps 流畅度的关键。
 *   **Quality**: 建议设置 `jpeg_quality = 12`。
 *   详情请参考: [部署与性能优化指南](deployment_guide.md)
+
+## 4. 控制协议详解 (Control Protocol)
+APP 会发送如下格式的 JSON 指令，请在固件中解析并执行：
+
+```json
+{
+  "type": "control",
+  "payload": {
+    "lx": 0.0,       // 左摇杆X (转向): -1.0(左) ~ 1.0(右)
+    "ly": 1.0,       // 左摇杆Y (前进): -1.0(后) ~ 1.0(前)
+    "bucket": 1,     // 铲斗: 1(挖), -1(卸), 0(停)
+    "arm": 0,        // 大臂: 1(升), -1(降), 0(停)
+    "boom": 0        // 小臂: 1(伸), -1(缩), 0(停)
+  }
+}
+```
+
+### C++ 解析示例 (需引入 ArduinoJson 库)
+
+```cpp
+#include <ArduinoJson.h>
+
+// 在 onWebSocketEvent 的 WStype_TEXT 分支中:
+void handleControl(uint8_t * payload) {
+  DynamicJsonDocument doc(1024);
+  deserializeJson(doc, payload);
+
+  JsonObject data = doc["payload"];
+  
+  // 1. 底盘控制 (L298N)
+  float speed = data["ly"]; // 获取 -1.0 ~ 1.0
+  float turn  = data["lx"];
+  // TODO: driveMotor(speed, turn);
+
+  // 2. 挖机动作 (Servo 舵机)
+  int bucket = data["bucket"]; // 1, -1, 0
+  if(bucket == 1) {
+    // servoBucket.write(180); // 挖
+  } else if (bucket == -1) {
+    // servoBucket.write(0);   // 卸
+  }
+}
+```
 ```
