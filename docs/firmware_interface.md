@@ -57,4 +57,9 @@ void onWebSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
     Serial.printf("[CMD] %s\n", payload);
   }
 }
+
+## 3. 性能优化 (Performance Tips)
+*   **分辨率**: 请务必设置为 `FRAMESIZE_QVGA` (320x240)。这是保证 25fps 流畅度的关键。
+*   **Quality**: 建议设置 `jpeg_quality = 12`。
+*   详情请参考: [部署与性能优化指南](deployment_guide.md)
 ```
